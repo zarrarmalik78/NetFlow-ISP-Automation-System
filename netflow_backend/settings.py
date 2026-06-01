@@ -25,7 +25,18 @@ load_env_file()
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
+
+# Production-ready ALLOWED_HOSTS
+if DEBUG:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
+else:
+    ALLOWED_HOSTS = [
+        "127.0.0.1",
+        "localhost",
+        os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""),
+        "isp-backend.onrender.com",  # Replace with your Render subdomain
+    ]
+    ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]  # Remove empty strings
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -98,7 +109,11 @@ DATABASES = {
         "PORT": DB_PORT,
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            "ssl": {
+                "ca": None,  # Planet Scale requires SSL
+            },
         },
+        "CONN_MAX_AGE": 60,  # Connection pooling for production
     }
 }
 
@@ -130,8 +145,27 @@ REST_FRAMEWORK = {
     ],
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development
 CORS_ALLOW_CREDENTIALS = True
+
+if not DEBUG:
+    # Production CORS settings - restrict to your frontend URL on Vercel
+    CORS_ALLOWED_ORIGINS = [
+        "https://your-frontend.vercel.app",  # Replace with your actual Vercel frontend URL
+        "http://localhost:3000",  # Keep for local development
+    ]
+    CSRF_TRUSTED_ORIGINS = [
+        "https://your-frontend.vercel.app",
+        "http://localhost:3000",
+    ]
+    # Security settings for production
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_SECURITY_POLICY = {
+        "default-src": ("'self'",),
+    }
 
 # Email configuration (reads from environment; sensible defaults provided)
 # By default in development (DEBUG=True) the console backend is used so emails

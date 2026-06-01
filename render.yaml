@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: isp-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn netflow_backend.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: netflow_backend.settings
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DB_HOST
+        fromDatabase:
+          name: isp_db
+          property: host
+      - key: DB_USER
+        fromDatabase:
+          name: isp_db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: isp_db
+          property: password
+      - key: DB_NAME
+        value: isp_automation_system
+      - key: DB_PORT
+        value: "3306"
+
+databases:
+  - name: isp_db
+    databaseName: isp_automation_system
+    user: isp_user
+    plan: free
