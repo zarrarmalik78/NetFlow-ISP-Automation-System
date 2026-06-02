@@ -1,7 +1,7 @@
 # ISP Backend Deployment Guide
 
 ## Overview
-This guide covers deploying your Django backend to Render and setting up a Planet Scale MySQL database.
+This guide covers deploying your Django backend to Render and setting up an Aiven MySQL database.
 
 ---
 
@@ -10,7 +10,7 @@ This guide covers deploying your Django backend to Render and setting up a Plane
 ### 1.1 Commit Your Changes
 ```bash
 git add .
-git commit -m "Add deployment files for Render and Planet Scale"
+git commit -m "Add deployment files for Render and Aiven"
 git push origin main
 ```
 
@@ -22,36 +22,46 @@ git push origin main
 
 ---
 
-## Step 2: Set Up Planet Scale Database
+## Step 2: Set Up Aiven MySQL Database
 
-### 2.1 Create Planet Scale Account
-1. Go to https://planetscale.com
-2. Sign up with GitHub account
-3. Click "Create a new database"
+### 2.1 Create Aiven Account
+1. Go to https://aiven.io
+2. Sign up with email or GitHub
+3. Create a new project
 
-### 2.2 Create Database
-1. Database name: `isp-automation-system`
-2. Region: Choose closest to Render (typically US regions)
-3. Click "Create database"
+### 2.2 Create MySQL Service
+1. In Aiven dashboard, click "Create service"
+2. Select "MySQL"
+3. Configuration:
+   - **Service name**: `isp-mysql`
+   - **Cloud provider**: AWS (or your preference)
+   - **Region**: Choose region closest to Render
+   - **Service plan**: Startup-4 (free tier, upgradeable)
+4. Click "Create service"
+5. Wait for initialization (~5-10 minutes)
 
 ### 2.3 Get Connection Details
-1. Click your database name
-2. Click "Connect" button
-3. Select "Django" from the dropdown
-4. Copy the connection string
-
-The connection string will look like:
-```
-mysql://[USERNAME]:[PASSWORD]@[HOST]/isp_automation_system
-```
+1. Once service is running, click on the service name
+2. Go to "Connection" tab
+3. You'll see several connection methods:
+   - **Host**: `mysql-xxxxx.aivencloud.com`
+   - **Port**: Usually `3306`
+   - **User**: `avnadmin` (default admin user)
+   - **Password**: Shown in the connection details
+   - **Database**: `defaultdb` or create a new database
 
 ### 2.4 Extract Connection Details
-From the connection string, extract:
-- **DB_HOST**: The host portion (e.g., `xxx.us-east-2.psdb.cloud`)
-- **DB_USER**: Username (e.g., `xxxxxxxx`)
-- **DB_PASSWORD**: Password
-- **DB_NAME**: `isp_automation_system`
+From the Aiven console, copy:
+- **DB_HOST**: The MySQL host (e.g., `mysql-xxxxx.aivencloud.com`)
+- **DB_USER**: `avnadmin`
+- **DB_PASSWORD**: The password provided
+- **DB_NAME**: Database name (create `isp_automation_system` or use `defaultdb`)
 - **DB_PORT**: `3306`
+
+### 2.5 Create Application Database (Optional)
+1. In Aiven, go to "Databases" section
+2. Create new database: `isp_automation_system`
+3. Or use the default database and create tables there
 
 ---
 
@@ -66,7 +76,7 @@ From the connection string, extract:
 
 ### 3.2 Configure Web Service
 1. **Name**: `isp-backend` (or your preferred name)
-2. **Region**: Choose same region as Planet Scale
+2. **Region**: Choose the same region as Aiven
 3. **Branch**: `main`
 4. **Runtime**: `Python 3`
 5. **Build Command**: `pip install -r requirements.txt`
@@ -79,9 +89,9 @@ Click "Advanced" → "Add Environment Variable" for each:
 ```
 DJANGO_SECRET_KEY = [Generate a random secure key]
 DJANGO_DEBUG = 0
-DB_HOST = [From Planet Scale connection string]
-DB_USER = [From Planet Scale connection string]
-DB_PASSWORD = [From Planet Scale connection string]
+DB_HOST = [From Aiven Connection tab]
+DB_USER = [From Aiven Connection tab]
+DB_PASSWORD = [From Aiven Connection tab]
 DB_NAME = isp_automation_system
 DB_PORT = 3306
 ```
@@ -184,10 +194,13 @@ export const fetchData = async () => {
 
 ### Issue: "Connection refused" to database
 **Solution:**
-1. Verify Planet Scale database is active
-2. Check DB_HOST, DB_USER, DB_PASSWORD in Render
-3. Ensure database name is correct: `isp_automation_system`
-4. Test connection locally with the same credentials
+1. Verify Aiven MySQL service is running (green status in dashboard)
+2. Check DB_HOST, DB_USER, DB_PASSWORD in Render are correct
+3. Ensure database name matches (create if needed in Aiven)
+4. **Allow Render IP in Aiven firewall**:
+   - In Aiven console → Service → "Networking"
+   - Add Render's IP or allow all `0.0.0.0/0` for testing (not production)
+5. Test locally with same credentials first
 
 ### Issue: CORS errors in frontend
 **Solution:**
@@ -213,16 +226,24 @@ python manage.py collectstatic --noinput
 
 ## Database Backups
 
-### Planet Scale Automatic Backups
-- Planet Scale automatically backs up your data
-- Backups are retained for 30 days on free plan
-- Access backups in Planet Scale dashboard
+### Aiven Automatic Backups
+- Aiven automatically backs up your data daily
+- Backups are retained based on your plan (typically 30 days)
+- Access backups in Aiven console → Service → "Backups"
+- Can restore to new service or point-in-time
 
-### Manual Backup
+### Manual Database Export
 ```bash
 # SSH into Render and export database:
 mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME > backup.sql
+
+# Then download the file
 ```
+
+### Aiven Database Maintenance
+- Monitor Aiven dashboard for maintenance windows
+- Backups happen automatically during non-peak hours
+- Check "Maintenance" tab for scheduled updates
 
 ---
 
@@ -233,7 +254,7 @@ mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME > backup.sql
 - [ ] render.yaml configured with web service
 - [ ] requirements.txt includes gunicorn, mysqlclient, python-dotenv
 - [ ] settings.py updated for production (ALLOWED_HOSTS, CORS, DEBUG=0)
-- [ ] Planet Scale database created and credentials obtained
+- [ ] Aiven database created and credentials obtained
 - [ ] Render service connected to GitHub repository
 - [ ] All environment variables set in Render dashboard
 - [ ] Database migrations run successfully
@@ -248,16 +269,17 @@ mysqldump -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME > backup.sql
 
 1. Monitor Render logs for errors: https://render.com/dashboard
 2. Test API endpoints from your frontend
-3. Set up monitoring/alerts in Render
-4. Configure custom domain if desired
-5. Set up email service for production
+3. Set up email service for production
+4. Configure authentication tokens
+5. Configure custom domain if needed
 
 ---
 
 ## Support Resources
 
+- **Aiven Docs**: https://docs.aiven.io/
+- **Aiven MySQL Docs**: https://docs.aiven.io/docs/products/mysql
 - **Render Docs**: https://render.com/docs
-- **Planet Scale Docs**: https://planetscale.com/docs
 - **Django Deployment**: https://docs.djangoproject.com/en/5.2/howto/deployment/
 - **gunicorn Docs**: https://docs.gunicorn.org/
 
