@@ -30,12 +30,16 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 else:
-    ALLOWED_HOSTS = [
-        "127.0.0.1",
-        "localhost",
-        os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""),
-        "isp-backend.onrender.com",  # Replace with your Render subdomain
-    ]
+    env_hosts = os.environ.get("ALLOWED_HOSTS")
+    if env_hosts:
+        ALLOWED_HOSTS = [host.strip() for host in env_hosts.split(",") if host.strip()]
+    else:
+        ALLOWED_HOSTS = [
+            "127.0.0.1",
+            "localhost",
+            os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""),
+            "isp-backend.onrender.com",  # Replace with your Render subdomain
+        ]
     ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]  # Remove empty strings
 
 INSTALLED_APPS = [
@@ -149,15 +153,20 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development
 CORS_ALLOW_CREDENTIALS = True
 
 if not DEBUG:
-    # Production CORS settings - restrict to your frontend URL on Vercel
-    CORS_ALLOWED_ORIGINS = [
-        "https://your-frontend.vercel.app",  # Replace with your actual Vercel frontend URL
-        "http://localhost:3000",  # Keep for local development
-    ]
-    CSRF_TRUSTED_ORIGINS = [
-        "https://your-frontend.vercel.app",
-        "http://localhost:3000",
-    ]
+    # Production CORS settings - restrict to your frontend URL
+    env_origins = os.environ.get("CORS_ALLOWED_ORIGINS")
+    if env_origins:
+        CORS_ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+        CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+    else:
+        CORS_ALLOWED_ORIGINS = [
+            "https://your-frontend.vercel.app",  # Replace with your actual frontend URL
+            "http://localhost:3000",  # Keep for local development
+        ]
+        CSRF_TRUSTED_ORIGINS = [
+            "https://your-frontend.vercel.app",
+            "http://localhost:3000",
+        ]
     # Security settings for production
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
